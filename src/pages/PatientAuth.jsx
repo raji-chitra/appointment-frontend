@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import API from '../services/api';   // ⬅️ USE API.JS (VERY IMPORTANT)
 
 const PatientAuth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || '/patient-dashboard';
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,7 +15,7 @@ const PatientAuth = () => {
     phone: '',
     address: ''
   });
-  
+
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,25 +28,28 @@ const PatientAuth = () => {
     try {
       if (isLogin) {
         // LOGIN
-        const response = await axios.post('http://localhost:5000/api/auth/login', {
+        const response = await API.post('/auth/login', {   // ⬅️ FIXED
           email: formData.email,
           password: formData.password
         });
 
-        if (response.data.success) {
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('userData', JSON.stringify(response.data.user));
+        if (response.success) {
+          localStorage.setItem('token', response.token);
+          localStorage.setItem('userData', JSON.stringify(response.user));
           navigate('/doctors');
+        } else {
+          setError(response.message || 'Invalid login');
         }
+
       } else {
-        // SIGN UP - Check password match first
+        // SIGN UP
         if (formData.password !== formData.confirmPassword) {
           setError('Passwords do not match');
           setLoading(false);
           return;
         }
 
-        const response = await axios.post('http://localhost:5000/api/auth/register', {
+        const response = await API.post('/auth/register', {   // ⬅️ FIXED
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -54,9 +57,9 @@ const PatientAuth = () => {
           address: formData.address
         });
 
-        if (response.data.success) {
-          alert('Signup successful! Please login with your credentials.');
-          // Clear form and switch to login
+        if (response.success) {
+          alert('Signup successful! Please login.');
+          setIsLogin(true);
           setFormData({
             name: '',
             email: '',
@@ -65,158 +68,118 @@ const PatientAuth = () => {
             phone: '',
             address: ''
           });
-          setIsLogin(true);
         } else {
-          setError(response.data.error || 'Signup failed');
+          setError(response.message || 'Signup failed');
         }
       }
+
     } catch (error) {
       console.error('API Error:', error);
-      if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
-        setError('Cannot connect to server. Make sure backend is running on port 5000.');
-      } else {
-        setError(error.response?.data?.message || error.response?.data?.error || 'Something went wrong. Please try again.');
-      }
+      setError(error.response?.data?.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
+
         <div className="text-center">
           <button
             onClick={() => navigate('/role-selection')}
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
+            className="text-blue-600 hover:text-blue-800 mb-4"
           >
-            ← Back to role selection
+            ← Back
           </button>
-          
+
           <h2 className="text-3xl font-bold text-gray-900">
             {isLogin ? 'Patient Login' : 'Patient Sign Up'}
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {isLogin ? 'Book appointments with doctors' : 'Create your patient account'}
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-100 text-red-700 border border-red-300 p-3 rounded">
               {error}
             </div>
           )}
 
           {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your full name"
-              />
-            </div>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              placeholder="Full Name"
+              className="w-full p-3 border rounded"
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your email"
-            />
-          </div>
+          <input
+            type="email"
+            required
+            value={formData.email}
+            placeholder="Email"
+            className="w-full p-3 border rounded"
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          />
+
+          <input
+            type="password"
+            required
+            value={formData.password}
+            placeholder="Password"
+            className="w-full p-3 border rounded"
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          />
 
           {!isLogin && (
             <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your phone number"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your address"
-                />
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your password"
-              minLength="6"
-            />
-          </div>
-
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
               <input
                 type="password"
                 required
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Confirm your password"
-                minLength="6"
+                placeholder="Confirm Password"
+                className="w-full p-3 border rounded"
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               />
-            </div>
+
+              <input
+                type="tel"
+                placeholder="Phone Number"
+                className="w-full p-3 border rounded"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+
+              <input
+                type="text"
+                placeholder="Address"
+                className="w-full p-3 border rounded"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              />
+            </>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-md text-base hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700"
           >
             {loading ? 'Processing...' : isLogin ? 'Login' : 'Sign Up'}
           </button>
         </form>
 
-        <div className="text-center">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-blue-600 hover:text-blue-800 text-sm"
-          >
-            {isLogin ? 'Don\'t have an account? Sign up here' : 'Already have an account? Login here'}
-          </button>
-        </div>
+        <button
+          onClick={() => setIsLogin(!isLogin)}
+          className="text-blue-600 hover:text-blue-800 text-center block w-full mt-4"
+        >
+          {isLogin ? "Don't have an account? Sign up" : "Already have an account? Login"}
+        </button>
+
       </div>
     </div>
   );

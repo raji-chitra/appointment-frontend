@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import API from "../services/api"; // ⬅️ uses your auto-detect backend URL
 
 const MyProfile = () => {
   const storedUser = JSON.parse(localStorage.getItem("userData")) || {};
 
   const [formData, setFormData] = useState({
-    name: storedUser?.name || "John Doe",
-    email: storedUser?.email || "user@example.com",
-    phone: storedUser?.phone || "1234567890",
+    name: storedUser?.name || "",
+    email: storedUser?.email || "",
+    phone: storedUser?.phone || "",
     address: storedUser?.address || {
-      line1: "123 Main Street",
-      line2: "New York, USA",
+      line1: "",
+      line2: "",
     },
   });
 
@@ -17,10 +18,7 @@ const MyProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   // phone validation
-  const validatePhone = (phone) => {
-    const regex = /^[0-9]{10}$/;
-    return regex.test(phone);
-  };
+  const validatePhone = (phone) => /^[0-9]{10}$/.test(phone);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -49,24 +47,21 @@ const MyProfile = () => {
 
     setErrors({});
 
-    // ✅ Apply default address if empty
     const finalFormData = {
       ...formData,
       address: {
-        line1: formData.address.line1 || "123 Default Street",
-        line2: formData.address.line2 || "City, Country",
+        line1: formData.address.line1 || "No address added",
+        line2: formData.address.line2 || "",
       },
     };
 
     try {
-      // --- If you have backend API uncomment this ---
-      /*
-      await fetch("http://localhost:5000/api/update-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalFormData),
-      });
-      */
+      const token = localStorage.getItem("token");
+
+      // Only send request if user is logged in
+      if (token) {
+        await API.put("/auth/update-profile", finalFormData);
+      }
 
       // Save in localStorage
       const updatedUser = { ...storedUser, ...finalFormData };
@@ -76,7 +71,7 @@ const MyProfile = () => {
       setIsEditing(false);
     } catch (err) {
       console.error(err);
-      alert("Something went wrong.");
+      alert("Error updating profile");
     }
   };
 
@@ -136,9 +131,7 @@ const MyProfile = () => {
             {formData.phone || "Not provided"}
           </p>
         )}
-        {errors.phone && (
-          <p className="text-red-500 text-sm">{errors.phone}</p>
-        )}
+        {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
       </div>
 
       {/* Address */}
@@ -166,10 +159,10 @@ const MyProfile = () => {
         ) : (
           <>
             <p className="p-2 bg-gray-50 rounded-md">
-              {formData.address.line1 || "123 Default Street"}
+              {formData.address.line1 || "Not provided"}
             </p>
             <p className="p-2 bg-gray-50 rounded-md">
-              {formData.address.line2 || "City, Country"}
+              {formData.address.line2 || ""}
             </p>
           </>
         )}

@@ -1,40 +1,37 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { adminAPI } from "../services/api";  // <-- USE CORRECT API WRAPPER
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
-    email: 'rajalakshmi@gmail.com',
-    password: 'admin123'
+    email: "rajalakshmi@gmail.com",
+    password: "123456"
   });
-  
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
-    try {
-      const res = await axios.post('http://localhost:5000/api/admin/login', {
-        email: formData.email,
-        password: formData.password
-      });
-      if (res.data.success) {
-        localStorage.setItem('adminToken', res.data.token);
-        localStorage.setItem('adminUser', JSON.stringify(res.data.user));
-        navigate('/admin-dashboard');
-      } else {
-        setError(res.data.message || 'Invalid credentials');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
+    const res = await adminAPI.login({
+      email: formData.email,
+      password: formData.password
+    });
+
+    if (res.success) {
+      localStorage.setItem("adminToken", res.token);
+      localStorage.setItem("adminUser", JSON.stringify(res.user));
+      navigate("/admin-dashboard");
+    } else {
+      setError(res.message || "Invalid credentials");
     }
+
+    setLoading(false);
   };
 
   return (
@@ -42,7 +39,7 @@ const AdminLogin = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
         <div className="text-center">
           <button
-            onClick={() => navigate('/role-selection')}
+            onClick={() => navigate("/role-selection")}
             className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,13 +47,9 @@ const AdminLogin = () => {
             </svg>
             Back to role selection
           </button>
-          
-          <h2 className="text-3xl font-bold text-gray-900">
-            Admin Login
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage doctors and system settings
-          </p>
+
+          <h2 className="text-3xl font-bold text-gray-900">Admin Login</h2>
+          <p className="mt-2 text-sm text-gray-600">Manage doctors and appointments</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -74,9 +67,10 @@ const AdminLogin = () => {
               type="email"
               required
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="admin@prescripto.com"
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className="w-full p-3 border border-gray-300 rounded-md"
             />
           </div>
 
@@ -88,24 +82,21 @@ const AdminLogin = () => {
               type="password"
               required
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your password"
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              className="w-full p-3 border border-gray-300 rounded-md"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-md text-base hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
           >
-            {loading ? 'Signing in...' : 'Sign in as Admin'}
+            {loading ? "Signing in..." : "Sign in as Admin"}
           </button>
         </form>
-
-        <div className="text-center">
-          <p className="text-xs text-gray-500">Use your configured admin account</p>
-        </div>
       </div>
     </div>
   );

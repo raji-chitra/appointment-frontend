@@ -1,120 +1,100 @@
-import React, { useState, useContext, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { AppContext } from '../context/AppContext'
+import React, { useState, useContext, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { AppContext } from '../context/AppContext';
+
+// IMPORT API BASE URL for images
+import API from '../services/api';
 
 const Appointment = () => {
-  const { docId } = useParams()
-  const { doctors, bookAppointment, userData } = useContext(AppContext)
-  const navigate = useNavigate()
+  const { docId } = useParams();
+  const { doctors, bookAppointment, userData } = useContext(AppContext);
+  const navigate = useNavigate();
 
-  // Redirect to login if user is not authenticated
+  // Prepare API base (remove /api for images)
+  const API_BASE = API.defaults.baseURL.replace("/api", "");
+
+  // Check login
   useEffect(() => {
-    // Check if we have userData in context or localStorage
     const hasToken = localStorage.getItem('token');
     const hasUserData = userData || localStorage.getItem('userData');
-    
+
     if (!hasUserData && !hasToken) {
       navigate('/patient-auth', { state: { from: `/appointment/${docId}` } });
-      return;
-    }
-    
-    // If we have userData in localStorage but not in context, try to load it
-    if (!userData && localStorage.getItem('userData')) {
-      try {
-        const storedUserData = JSON.parse(localStorage.getItem('userData'));
-        if (storedUserData && storedUserData.name) {
-          setFormData(prev => ({ ...prev, name: storedUserData.name }));
-        }
-      } catch (error) {
-        console.error('Error parsing userData from localStorage:', error);
-      }
     }
   }, [userData, navigate, docId]);
 
-  const doctor = doctors.find(d => String(d._id) === String(docId))
+  const doctor = doctors.find((d) => String(d._id) === String(docId));
 
-  // Try to get userData from localStorage if not available in context
-  const getUserDataFromStorage = () => {
-    if (userData) return userData;
+  const storedUser = (() => {
     try {
-      const storedUserData = localStorage.getItem('userData');
-      return storedUserData ? JSON.parse(storedUserData) : null;
-    } catch (error) {
-      console.error('Error parsing userData from localStorage:', error);
+      if (userData) return userData;
+      const data = localStorage.getItem('userData');
+      return data ? JSON.parse(data) : null;
+    } catch {
       return null;
     }
-  };
-  
-  const storedUserData = getUserDataFromStorage();
-  
+  })();
+
   const [formData, setFormData] = useState({
-    name: storedUserData?.name || '',
+    name: storedUser?.name || '',
     phone: '',
     date: '',
     time: '',
     reason: ''
-  })
+  });
 
-  const [errors, setErrors] = useState({})
-  const [minDate, setMinDate] = useState('')
-  const [availableSlots, setAvailableSlots] = useState([])
+  const [errors, setErrors] = useState({});
+  const [minDate, setMinDate] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
 
+  // Generate time slots & min date
   useEffect(() => {
-    if (userData && userData.name) {
-      setFormData(prev => ({ ...prev, name: userData.name }))
+    if (userData?.name) {
+      setFormData((prev) => ({ ...prev, name: userData.name }));
     }
 
-    // Set minimum date to tomorrow
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    setMinDate(tomorrow.toISOString().split('T')[0])
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setMinDate(tomorrow.toISOString().split('T')[0]);
 
-    generateTimeSlots()
-  }, [userData])
-
-  const generateTimeSlots = () => {
-    const slots = []
+    const slots = [];
     for (let hour = 9; hour <= 17; hour++) {
-      if (hour === 12) continue // Skip lunch
-      const amPm = hour >= 12 ? 'PM' : 'AM'
-      const hour12 = hour > 12 ? hour - 12 : hour
-      slots.push(`${hour12}:00 ${amPm}`)
-      if (hour < 17) slots.push(`${hour12}:30 ${amPm}`)
+      if (hour !== 12) {
+        const hour12 = hour > 12 ? hour - 12 : hour;
+        const ampm = hour >= 12 ? "PM" : "AM";
+        slots.push(`${hour12}:00 ${ampm}`);
+        if (hour < 17) slots.push(`${hour12}:30 ${ampm}`);
+      }
     }
-    setAvailableSlots(slots)
-  }
+    setAvailableSlots(slots);
+  }, [userData]);
 
-  const validatePhone = (phone) => /^\d{10}$/.test(phone)
-
-  const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id)
+  const validatePhone = (n) => /^\d{10}$/.test(n);
+  const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
+    // Validation
     if (!validatePhone(formData.phone)) {
-      setErrors({ phone: 'Please enter a valid 10-digit phone number' })
-      return
+      return setErrors({ phone: 'Enter a valid 10-digit number' });
     }
-    if (!formData.date) return setErrors({ date: 'Please select a date' })
-    if (!formData.time) return setErrors({ time: 'Please select a time' })
-    if (!formData.reason.trim()) return setErrors({ reason: 'Please provide a reason' })
+    if (!formData.date) return setErrors({ date: 'Select a date' });
+    if (!formData.time) return setErrors({ time: 'Select a time' });
+    if (!formData.reason.trim()) return setErrors({ reason: 'Enter a reason' });
 
-    setErrors({})
+    setErrors({});
 
     if (!isValidObjectId(docId)) {
-      alert('Selected doctor is from demo data. Please ask admin to add this doctor first, then try again.')
-      return
+      alert("This is a demo doctor. Ask admin to add real doctor.");
+      return;
     }
 
-    // Check if we have userData from context or try to get it from localStorage
-    const userDataFromStorage = !userData && localStorage.getItem('userData') ? JSON.parse(localStorage.getItem('userData')) : null;
-    const currentUserData = userData || userDataFromStorage;
-    
-    // Make sure we have user data before proceeding
-    if (!currentUserData) {
-      alert('Please log in to book an appointment')
-      navigate('/patient-auth', { state: { from: `/appointment/${docId}` } })
-      return
+    const userStored = storedUser;
+    if (!userStored) {
+      alert('Please log in first.');
+      navigate('/patient-auth', { state: { from: `/appointment/${docId}` } });
+      return;
     }
 
     const appointment = {
@@ -122,33 +102,24 @@ const Appointment = () => {
       date: formData.date,
       time: formData.time,
       symptoms: formData.reason
-    }
+    };
 
     try {
-      const result = await bookAppointment(appointment)
-      
-      if (result?.success) {
-        alert('Appointment booked successfully!')
-        navigate('/my-appointments')
+      const res = await bookAppointment(appointment);
+
+      if (res?.success) {
+        alert("Appointment booked successfully!");
+        navigate('/my-appointments');
       } else {
-        alert(result?.message || 'Failed to book appointment. Please try again.')
+        alert(res?.message || "Failed to book appointment");
       }
     } catch (error) {
-      console.error('Error booking appointment:', error)
-      alert('Something went wrong. Please try again.')
+      alert("Something went wrong");
     }
-  }
-
-  const handlePhoneChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '')
-    if (value.length <= 10) {
-      setFormData({ ...formData, phone: value })
-      if (errors.phone) setErrors({ ...errors, phone: '' })
-    }
-  }
+  };
 
   if (!doctor) {
-    return <div className="min-h-[80vh] flex items-center justify-center">Doctor not found</div>
+    return <div className="min-h-[80vh] flex items-center justify-center">Doctor not found</div>;
   }
 
   return (
@@ -158,102 +129,105 @@ const Appointment = () => {
 
         {/* Doctor details */}
         <div className="flex items-center mb-6">
-          <img 
-            src={doctor.image ? (doctor.image.startsWith('http') ? doctor.image : `http://localhost:5000${doctor.image}`) : '/src/assets/doc1.png'} 
-            alt={doctor.name} 
-            className="w-16 h-16 rounded-full mr-4" 
+          <img
+            src={
+              doctor.image
+                ? (doctor.image.startsWith("http")
+                    ? doctor.image
+                    : `${API_BASE}${doctor.image}`)
+                : "/src/assets/doc1.png"
+            }
+            alt={doctor.name}
+            className="w-16 h-16 rounded-full mr-4"
             onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = '/src/assets/doc1.png';
+              e.target.src = "/src/assets/doc1.png";
             }}
           />
           <div>
             <h3 className="font-semibold">{doctor.name}</h3>
             <p className="text-gray-600">{doctor.speciality}</p>
             <p className="text-sm text-gray-500">{doctor.experience}</p>
-            <p className="text-sm text-green-600 font-semibold">Fee: ${doctor.fees}</p>
+            <p className="text-sm text-green-600 font-semibold">Fee: ₹{doctor.fees}</p>
           </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            />
-          </div>
+          {/* Name */}
+          <input
+            type="text"
+            required
+            className="w-full p-2 border rounded"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          />
 
+          {/* Phone */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
             <input
               type="tel"
               required
-              value={formData.phone}
-              onChange={handlePhoneChange}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="Enter 10-digit number"
               maxLength="10"
+              className="w-full p-2 border rounded"
+              placeholder="Phone Number"
+              value={formData.phone}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v.length <= 10) setFormData({ ...formData, phone: v });
+              }}
             />
-            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+            {errors.phone && <p className="text-red-500 text-xs">{errors.phone}</p>}
           </div>
 
+          {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
             <input
               type="date"
               required
+              className="w-full p-2 border rounded"
               value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded-md"
               min={minDate}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
             />
-            {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
+            {errors.date && <p className="text-red-500 text-xs">{errors.date}</p>}
           </div>
 
+          {/* Time */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
             <select
+              className="w-full p-2 border rounded"
               required
               value={formData.time}
               onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded-md"
             >
-              <option value="">Select time</option>
-              {availableSlots.map(slot => (
-                <option key={slot} value={slot}>{slot}</option>
+              <option value="">Select Time</option>
+              {availableSlots.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            {errors.time && <p className="text-red-500 text-xs mt-1">{errors.time}</p>}
+            {errors.time && <p className="text-red-500 text-xs">{errors.time}</p>}
           </div>
 
+          {/* Reason */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Visit *</label>
             <textarea
               required
+              rows="3"
+              className="w-full p-2 border rounded"
+              placeholder="Reason for appointment"
               value={formData.reason}
               onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              rows="3"
-              placeholder="Please describe your symptoms or reason for appointment"
-            ></textarea>
-            {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
+            />
+            {errors.reason && <p className="text-red-500 text-xs">{errors.reason}</p>}
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition"
-          >
+          <button className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
             Book Appointment
           </button>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Appointment
+export default Appointment;

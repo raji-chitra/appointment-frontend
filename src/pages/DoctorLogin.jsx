@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import API from '../services/api'; // ✅ Use API wrapper (important!)
 
 const DoctorLogin = () => {
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     email: 'doctor.doc@gmail.com',
     password: 'doctor123'
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,10 +19,12 @@ const DoctorLogin = () => {
     setError('');
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
+      
+      const res = await API.post('/auth/login', {
         email: formData.email,
         password: formData.password
       });
+
       if (res.data.success && res.data.user?.role === 'doctor') {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('userData', JSON.stringify(res.data.user));
@@ -32,9 +34,9 @@ const DoctorLogin = () => {
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   };
 
   return (
@@ -50,7 +52,7 @@ const DoctorLogin = () => {
             </svg>
             Back to role selection
           </button>
-          
+
           <h2 className="text-3xl font-bold text-gray-900">
             Doctor Login
           </h2>
@@ -74,8 +76,8 @@ const DoctorLogin = () => {
               type="email"
               required
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-md"
               placeholder="Enter your email"
             />
           </div>
@@ -88,8 +90,8 @@ const DoctorLogin = () => {
               type="password"
               required
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-md"
               placeholder="Enter your password"
             />
           </div>
@@ -97,7 +99,7 @@ const DoctorLogin = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-md text-base hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
           >
             {loading ? 'Signing in...' : 'Sign in as Doctor'}
           </button>
