@@ -1,247 +1,191 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-// Create axios instance
+/* -------------------------------------------
+    AUTO-DETECT BACKEND URL  
+    - Local: uses http://localhost:5000/api
+    - Render: uses Vite env → VITE_API_URL
+-------------------------------------------- */
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+console.log("🔗 API Base URL =", API_BASE_URL);
+
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
-// Request interceptor to add auth token
+/* -------------------------------------------
+    REQUEST INTERCEPTOR 
+-------------------------------------------- */
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token && token !== 'false') {
+    const token = localStorage.getItem("token");
+    const adminToken = localStorage.getItem("adminToken");
+
+    if (token && token !== "false") {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (adminToken && adminToken !== "false") {
+      config.headers.Authorization = `Bearer ${adminToken}`;
+    }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+/* -------------------------------------------
+    RESPONSE INTERCEPTOR 
+-------------------------------------------- */
 API.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('API Error:', error);
-    
+    console.error("API Error:", error);
+
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('userData');
-      window.location.href = '/login';
-      return Promise.reject(error);
+      localStorage.removeItem("token");
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("userData");
+      window.location.href = "/login";
+      return;
     }
-    
-    const rawMessage = error.response?.data?.message || 'Something went wrong'
-    const message = typeof rawMessage === 'string' ? rawMessage : JSON.stringify(rawMessage)
-    // Diagnostic logging to help debug invalid toast payloads
+
+    const message =
+      error.response?.data?.message ||
+      "Something went wrong. Try again later.";
+
     try {
-      console.log('API interceptor - toast payload type:', typeof message, 'payload:', message)
-      toast.error(message)
-    } catch (e) {
-      console.warn('toast.error failed to render message, falling back to string:', message, e)
-      try {
-        toast.error(String(message))
-      } catch (e2) {
-        console.error('Secondary toast.error failed as well:', String(message), e2)
-      }
+      toast.error(message);
+    } catch {
+      toast.error(String(message));
     }
-    
+
     return Promise.reject(error);
   }
 );
 
-// Auth API calls
+/* -------------------------------------------
+    AUTH APIs
+-------------------------------------------- */
 export const authAPI = {
-  // Sign up
-  signup: async (userData) => {
+  signup: async (data) => {
     try {
-      const response = await API.post('/auth/signup', userData);
-      return response.data;
+      const res = await API.post("/auth/signup", data);
+      return res.data;
     } catch (error) {
-      console.error('API Error during signup:', error);
-      // Return error response instead of throwing
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      return { success: false, message: error.message || 'Network error occurred' };
+      return error.response?.data || { success: false, message: "Signup failed" };
     }
   },
 
-  // Login
-  login: async (credentials) => {
+  login: async (data) => {
     try {
-      const response = await API.post('/auth/login', credentials);
-      return response.data;
+      const res = await API.post("/auth/login", data);
+      return res.data;
     } catch (error) {
-      console.error('API Error during login:', error);
-      // Return error response instead of throwing
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      return { success: false, message: error.message || 'Network error occurred' };
+      return error.response?.data || { success: false, message: "Login failed" };
     }
   },
 
-  // Get current user
   getMe: async () => {
-    try {
-      const response = await API.get('/auth/me');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
+    const res = await API.get("/auth/me");
+    return res.data;
   },
-
-  // Update profile
-  updateProfile: async (profileData) => {
-    try {
-      const response = await API.put('/auth/profile', profileData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
 };
 
-// Appointments API calls
-export const appointmentsAPI = {
-  // Book appointment
-  bookAppointment: async (appointmentData) => {
-    try {
-      const response = await API.post('/appointments/book', appointmentData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  // Get user's appointments
-  getMyAppointments: async () => {
-    try {
-      const response = await API.get('/appointments/my-appointments');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  // Cancel appointment
-  cancelAppointment: async (appointmentId) => {
-    try {
-      const response = await API.put(`/appointments/${appointmentId}/cancel`);
-      return response.data;
-    } catch (error) {
-      console.error('API Error during appointment cancellation:', error);
-      // Return error response instead of throwing
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      return { success: false, message: error.message || 'Network error occurred' };
-    }
-  },
-
-  // Update payment status
-  updatePayment: async (appointmentId, paymentData) => {
-    try {
-      const response = await API.put(`/appointments/${appointmentId}/payment`, paymentData);
-      return response.data;
-    } catch (error) {
-      console.error('API Error during payment update:', error);
-      // Return error response instead of throwing
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      return { success: false, message: error.message || 'Network error occurred' };
-    }
-  }
-};
-
-// Admin API calls
-export const adminAPI = {
-  login: async (credentials) => {
-    try {
-      const response = await API.post('/admin/login', credentials);
-      return response.data;
-    } catch (error) {
-      if (error.response?.data) return error.response.data;
-      return { success: false, message: error.message || 'Network error occurred' };
-    }
-  },
-  // Doctor management
-  getDoctors: async () => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.get('/admin/doctors', { headers: { Authorization: `Bearer ${adminToken}` } });
-    return res.data;
-  },
-  addDoctor: async (payload) => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.post('/admin/doctors', payload, { headers: { Authorization: `Bearer ${adminToken}` } });
-    return res.data;
-  },
-  updateDoctor: async (id, payload) => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.put(`/admin/doctors/${id}`, payload, { headers: { Authorization: `Bearer ${adminToken}` } });
-    return res.data;
-  },
-  removeDoctor: async (id) => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.delete(`/admin/doctors/${id}`, { headers: { Authorization: `Bearer ${adminToken}` } });
-    return res.data;
-  },
-  getAppointments: async () => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.get('/admin/appointments', {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    return res.data;
-  },
-  updateAppointmentStatus: async (appointmentId, status) => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.put(`/admin/appointments/${appointmentId}/status`, { status }, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    return res.data;
-  },
-  getDashboardStats: async () => {
-    const adminToken = localStorage.getItem('adminToken');
-    const res = await API.get('/admin/dashboard/stats', {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    return res.data;
-  }
-};
-
-// Public API - endpoints accessible without admin auth
+/* -------------------------------------------
+    PUBLIC API
+-------------------------------------------- */
 export const publicAPI = {
   getDoctors: async () => {
     try {
-      const response = await API.get('/doctors');
-      return response.data;
+      const res = await API.get("/doctors");
+      return res.data;
     } catch (error) {
-      console.error('Public API getDoctors error:', error);
-      if (error.response?.data) return error.response.data;
-      return { success: false, message: error.message || 'Network error occurred' };
+      return error.response?.data || { success: false, message: "Failed to load doctors" };
     }
-  }
+  },
 };
 
-// Health check
+/* -------------------------------------------
+    APPOINTMENTS API
+-------------------------------------------- */
+export const appointmentsAPI = {
+  bookAppointment: async (data) => {
+    try {
+      const res = await API.post("/appointments/book", data);
+      return res.data;
+    } catch (error) {
+      return error.response?.data || { success: false, message: "Failed to book" };
+    }
+  },
+
+  getMyAppointments: async () => {
+    const res = await API.get("/appointments/my-appointments");
+    return res.data;
+  },
+
+  cancelAppointment: async (id) => {
+    try {
+      const res = await API.put(`/appointments/${id}/cancel`);
+      return res.data;
+    } catch (error) {
+      return error.response?.data || { success: false, message: "Cancel failed" };
+    }
+  },
+};
+
+/* -------------------------------------------
+    ADMIN API 
+-------------------------------------------- */
+export const adminAPI = {
+  login: async (creds) => {
+    try {
+      const res = await API.post("/admin/login", creds);
+      return res.data;
+    } catch (error) {
+      return error.response?.data || { success: false, message: "Admin login failed" };
+    }
+  },
+
+  getDoctors: async () => {
+    const res = await API.get("/admin/doctors");
+    return res.data;
+  },
+
+  addDoctor: async (data) => {
+    const res = await API.post("/admin/doctors", data);
+    return res.data;
+  },
+
+  updateDoctor: async (id, data) => {
+    const res = await API.put(`/admin/doctors/${id}`, data);
+    return res.data;
+  },
+
+  removeDoctor: async (id) => {
+    const res = await API.delete(`/admin/doctors/${id}`);
+    return res.data;
+  },
+
+  getDashboardStats: async () => {
+    const res = await API.get("/admin/dashboard/stats");
+    return res.data;
+  },
+};
+
+/* -------------------------------------------
+    HEALTH CHECK
+-------------------------------------------- */
 export const healthCheck = async () => {
-  try {
-    const response = await API.get('/health');
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || error;
-  }
+  const res = await API.get("/health");
+  return res.data;
 };
 
 export default API;
